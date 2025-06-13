@@ -65,10 +65,19 @@ foreach (var run in runs)
     runDetailsResponse.EnsureSuccessStatusCode();
     using var runDetailsStream = await runDetailsResponse.Content.ReadAsStreamAsync();
     using var runDetailsDoc = await JsonDocument.ParseAsync(runDetailsStream);
-
+        
     // Check status and steps
     var state = runDetailsDoc.RootElement.GetProperty("state").GetString();
-    var result = runDetailsDoc.RootElement.GetProperty("result").GetString();
+    string? result = null;
+    if (runDetailsDoc.RootElement.TryGetProperty("result", out var resultElement))
+    {
+        result = resultElement.GetString();
+    }
+    else
+    {
+        Console.WriteLine("Warning: 'result' property not found in run details. Dumping JSON for inspection:");
+        Console.WriteLine(await runDetailsResponse.Content.ReadAsStringAsync());
+    }
 
     if (state == "completed" && result == "succeeded")
     {
