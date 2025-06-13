@@ -1,9 +1,11 @@
 ﻿using Azure.Identity;
+using Microsoft.Extensions.Configuration;
+using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.TeamFoundation.Core.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
-using Microsoft.Extensions.Configuration;
+using System.Net;
 
 namespace AzureDevOpsSample
 {
@@ -44,6 +46,39 @@ namespace AzureDevOpsSample
                     foreach (var repo in repositories)
                     {
                         Console.WriteLine($"- {repo.Name}");
+                    }
+
+                    // Find the repository by name
+                    var repository = repositories.FirstOrDefault(r => r.Name.Equals(repoName, StringComparison.OrdinalIgnoreCase));
+                    if (repository != null)
+                    {
+                        // Get the build client
+                        using (var buildClient = connection.GetClient<BuildHttpClient>())
+                        {
+                            // Define build query parameters
+                                var buildDefinitions = await buildClient.GetDefinitionsAsync(projectName, repositoryId: repository.Id);
+                            if (buildDefinitions.Any())
+                            {
+                                var buildDefinition = buildDefinitions.First();
+
+                                // Retrieve the 2 most recent builds
+                                var builds = await buildClient.GetBuildsAsync(projectId, definitions: new[] { buildDefinition.Id }, top: 2);
+
+                                Console.WriteLine($"\nRecent builds for repository '{repoName}':");
+                                foreach (var build in builds)
+                                {
+                                    Console.WriteLine($"- Build #{build.BuildNumber}: Status = {build.Status}, Result = {build.Result}, Started = {build.StartTime}, Finished = {build.FinishTime}");
+                                }
+                            }
+                            else
+                            {
+                                Console.WriteLine($"No build definitions found for repository '{repoName}'.");
+                            }
+                        }
+                    }
+                    else
+                    {
+                        Console.WriteLine($"Repository '{repoName}' not found.");
                     }
                 }
             }
