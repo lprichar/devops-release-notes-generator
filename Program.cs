@@ -12,6 +12,7 @@ var config = new ConfigurationBuilder()
 
 var pat = config["pat"];
 var org = config["org"];
+var project = config["project"];
 var repoName = config["repo"];
 
 if (string.IsNullOrWhiteSpace(pat))
@@ -22,6 +23,11 @@ if (string.IsNullOrWhiteSpace(pat))
 if (string.IsNullOrWhiteSpace(org))
 {
     Console.WriteLine("No organization found in user-secrets under the key 'org'.");
+    return;
+}
+if (string.IsNullOrWhiteSpace(project))
+{
+    Console.WriteLine("No project name found in user-secrets under the key 'project'.");
     return;
 }
 if (string.IsNullOrWhiteSpace(repoName))
@@ -37,7 +43,7 @@ var connection = new VssConnection(new Uri(organizationUrl), new VssBasicCredent
 try
 {
     var gitClient = connection.GetClient<GitHttpClient>();
-    var repo = await gitClient.GetRepositoryAsync(repoName);
+    var repo = await gitClient.GetRepositoryAsync(project, repoName);
 
     Console.WriteLine($"Repository info for '{repoName}':");
     Console.WriteLine($"- Name: {repo.Name}");
