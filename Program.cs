@@ -1,7 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
-using Microsoft.TeamFoundation.SourceControl.WebApi;
-using Microsoft.VisualStudio.Services.Common;
-using Microsoft.VisualStudio.Services.WebApi;
+using System.Net.Http.Headers;
+using System.Text.Json;
 
 // See https://aka.ms/new-console-template for more information
 Console.WriteLine("Hello, World!");
@@ -13,45 +12,88 @@ var config = new ConfigurationBuilder()
 var pat = config["pat"];
 var org = config["org"];
 var project = config["project"];
-var repoName = config["repo"];
 
-if (string.IsNullOrWhiteSpace(pat))
+if (string.IsNullOrWhiteSpace(pat) || string.IsNullOrWhiteSpace(org) || string.IsNullOrWhiteSpace(project))
 {
-    Console.WriteLine("No PAT found in user-secrets under the key 'pat'.");
-    return;
-}
-if (string.IsNullOrWhiteSpace(org))
-{
-    Console.WriteLine("No organization found in user-secrets under the key 'org'.");
-    return;
-}
-if (string.IsNullOrWhiteSpace(project))
-{
-    Console.WriteLine("No project name found in user-secrets under the key 'project'.");
-    return;
-}
-if (string.IsNullOrWhiteSpace(repoName))
-{
-    Console.WriteLine("No repository name found in user-secrets under the key 'repo'.");
+    Console.WriteLine("Missing required secrets: pat, org, or project.");
     return;
 }
 
-var organizationUrl = $"https://dev.azure.com/{org}";
+var baseUrl = $"https://dev.azure.com/{org}/{project}/_apis/";
+using var http = new HttpClient();
+var authToken = Convert.ToBase64String(System.Text.Encoding.ASCII.GetBytes($":{pat}"));
+http.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Basic", authToken);
 
-var connection = new VssConnection(new Uri(organizationUrl), new VssBasicCredential(string.Empty, pat));
+// 1. Get the pipeline ID for "CD"
+var pipelinesUrl = $"{baseUrl}pipelines?api-version=7.2-preview.1";
+var pipelinesResponse = await http.GetAsync(pipelinesUrl);
+pipelinesResponse.EnsureSuccessStatusCode();
+using var pipelinesStream = await pipelinesResponse.Content.ReadAsStreamAsync();
+using var pipelinesDoc = await JsonDocument.ParseAsync(pipelinesStream);
 
-try
+var cdPipeline = pipelinesDoc.RootElement
+    .GetProperty("value")
+    .EnumerateArray()
+    .FirstOrDefault(p => p.GetProperty("name").GetString() == "CD");
+
+if (cdPipeline.ValueKind == JsonValueKind.Undefined)
 {
-    var gitClient = connection.GetClient<GitHttpClient>();
-    var repo = await gitClient.GetRepositoryAsync(project, repoName);
+    Console.WriteLine("Pipeline 'CD' not found.");
+    return;
+}
 
-    Console.WriteLine($"Repository info for '{repoName}':");
-    Console.WriteLine($"- Name: {repo.Name}");
-    Console.WriteLine($"- Id: {repo.Id}");
-    Console.WriteLine($"- Default branch: {repo.DefaultBranch}");
-    Console.WriteLine($"- Remote URL: {repo.RemoteUrl}");
-}
-catch (Exception ex)
+var pipelineId = cdPipeline.GetProperty("id").GetInt32();
+
+// 2. Get the latest runs for the "CD" pipeline
+var runsUrl = $"{baseUrl}pipelines/{pipelineId}/runs?api-version=7.2-preview.1";
+var runsResponse = await http.GetAsync(runsUrl);
+runsResponse.EnsureSuccessStatusCode();
+using var runsStream = await runsResponse.Content.ReadAsStreamAsync();
+using var runsDoc = await JsonDocument.ParseAsync(runsStream);
+
+var runs = runsDoc.RootElement.GetProperty("value").EnumerateArray();
+
+// 3. Find the latest successful run that completed all 4 steps
+foreach (var run in runs)
 {
-    Console.WriteLine($"Error connecting to Azure DevOps: {ex.Message}");
+    var runId = run.GetProperty("id").GetInt32();
+    var runTitle = run.GetProperty("name").GetString();
+
+    // Get run details (including stages and steps)
+    var runDetailsUrl = $"{baseUrl}pipelines/{pipelineId}/runs/{runId}?api-version=7.2-preview.1";
+    var runDetailsResponse = await http.GetAsync(runDetailsUrl);
+    runDetailsResponse.EnsureSuccessStatusCode();
+    using var runDetailsStream = await runDetailsResponse.Content.ReadAsStreamAsync();
+    using var runDetailsDoc = await JsonDocument.ParseAsync(runDetailsStream);
+
+    // Check status and steps
+    var state = runDetailsDoc.RootElement.GetProperty("state").GetString();
+    var result = runDetailsDoc.RootElement.GetProperty("result").GetString();
+
+    if (state == "completed" && result == "succeeded")
+    {
+        // Try to get steps (jobs/tasks) - this structure may vary depending on pipeline type
+        if (runDetailsDoc.RootElement.TryGetProperty("stages", out var stages))
+        {
+            foreach (var stage in stages.EnumerateArray())
+            {
+                if (stage.TryGetProperty("jobs", out var jobs))
+                {
+                    foreach (var job in jobs.EnumerateArray())
+                    {
+                        if (job.TryGetProperty("steps", out var steps))
+                        {
+                            if (steps.GetArrayLength() == 4)
+                            {
+                                Console.WriteLine($"Last successful 'CD' deployment to production: {runTitle}");
+                                return;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 }
+
+Console.WriteLine("No successful 'CD' deployment to production with 4 steps found.");
