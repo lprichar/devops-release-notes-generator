@@ -72,12 +72,29 @@ var builds = await buildClient.GetBuildsAsync(
     top: 10
 );
 
-// Find the First Successful and Completed Build
-var firstSuccessfulBuild = builds.FirstOrDefault(b => b.Status == BuildStatus.Completed && b.Result == BuildResult.Succeeded);
-if (firstSuccessfulBuild != null)
+// Find the Last Production Deployment
+var lastProductionDeployment = builds.FirstOrDefault(b => b.Status == BuildStatus.Completed && b.Result == BuildResult.Succeeded);
+if (lastProductionDeployment != null)
 {
-    Console.WriteLine("First Successful and Completed Build:");
-    Console.WriteLine($"Build ID: {firstSuccessfulBuild.Id}, Status: {firstSuccessfulBuild.Status}, Result: {firstSuccessfulBuild.Result}, Completed: {firstSuccessfulBuild.FinishTime}");
+    Console.WriteLine("Last Production Deployment:");
+    Console.WriteLine($"Build ID: {lastProductionDeployment.Id}, Status: {lastProductionDeployment.Status}, Result: {lastProductionDeployment.Result}, Completed: {lastProductionDeployment.FinishTime}");
+
+    // Retrieve All Pull Requests and Filter by Creation Date
+    var pullRequests = await gitClient.GetPullRequestsAsync(
+        targetRepo.Id,
+        new GitPullRequestSearchCriteria
+        {
+            Status = PullRequestStatus.Active
+        }
+    );
+
+    var filteredPullRequests = pullRequests.Where(pr => pr.CreationDate > lastProductionDeployment.FinishTime);
+
+    Console.WriteLine("Pull Requests Created After Last Production Deployment:");
+    foreach (var pr in filteredPullRequests)
+    {
+        Console.WriteLine($"PR ID: {pr.PullRequestId}, Title: {pr.Title}, Created: {pr.CreationDate}");
+    }
 }
 else
 {
