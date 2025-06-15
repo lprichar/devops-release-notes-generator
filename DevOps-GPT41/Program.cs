@@ -1,113 +1,33 @@
-﻿using Microsoft.Extensions.Configuration;
-using Microsoft.TeamFoundation.SourceControl.WebApi;
-using Microsoft.TeamFoundation.Build.WebApi;
-using Microsoft.VisualStudio.Services.Common;
-using Microsoft.VisualStudio.Services.WebApi;
-using System.Globalization;
+﻿namespace DevOps_GPT41;
 
-// Load configuration
-var builder = new ConfigurationBuilder()
-    .AddUserSecrets<Program>();
-var configuration = builder.Build();
-
-// Retrieve configuration values
-string? repo = configuration["repo"];
-string? org = configuration["org"];
-string? pat = configuration["pat"];
-string? project = configuration["project"];
-
-if (string.IsNullOrEmpty(repo) || string.IsNullOrEmpty(org) || string.IsNullOrEmpty(pat) || string.IsNullOrEmpty(project))
+internal abstract class Program
 {
-    Console.WriteLine("Missing required configuration values: 'repo', 'org', 'pat', or 'project'.");
-    return;
-}
+    static async Task Main()
+    {
+        var configData = new ConfigurationData();
 
-// Authenticate with Azure DevOps
-Uri orgUrl = new Uri($"https://dev.azure.com/{org}");
-VssCredentials credentials = new VssBasicCredential(string.Empty, pat);
-using var connection = new VssConnection(orgUrl, credentials);
+        var connection = new Connection(configData.Org, configData.Pat);
+        var lastProductionDeploymentStartTime = await connection.GetLastProductionDeployment(configData.Project, "CD");
 
-// Retrieve repository data
-var gitClient = connection.GetClient<GitHttpClient>();
-var repositories = await gitClient.GetRepositoriesAsync();
-var targetRepo = repositories.FirstOrDefault(r => r.Name.Equals(repo, StringComparison.OrdinalIgnoreCase));
-
-if (targetRepo != null)
-{
-    Console.WriteLine($"Repository found: {targetRepo.Name}");
-    Console.WriteLine($"ID: {targetRepo.Id}");
-    Console.WriteLine($"URL: {targetRepo.RemoteUrl}");
-}
-else
-{
-    Console.WriteLine("Repository not found.");
-    return;
-}
-
-// Retrieve Build Data
-var buildClient = connection.GetClient<BuildHttpClient>();
-
-var definitions = await buildClient.GetDefinitionsAsync(project: project);
-
-if (definitions == null || definitions.Count == 0)
-{
-    Console.WriteLine("Pipeline 'CD' not found.");
-    return;
-}
-
-var definition = definitions.FirstOrDefault(d => d.Name.Equals("CD", StringComparison.OrdinalIgnoreCase));
-
-if (definition == null)
-{
-    Console.WriteLine("Pipeline 'CD' not found.");
-    return;
-}
-
-var definitionId = definition.Id;
-var builds = await buildClient.GetBuildsAsync(
-    project: project,
-    definitions: new List<int> { definitionId },
-    queryOrder: BuildQueryOrder.StartTimeDescending,
-    top: 10
-);
-
-// Find the Last Production Deployment
-var lastProductionDeployment = builds.FirstOrDefault(b => b.Status == BuildStatus.Completed && b.Result == BuildResult.Succeeded);
-if (lastProductionDeployment != null)
-{
-    Console.WriteLine("Last Production Deployment:");
-    Console.WriteLine($"Build ID: {lastProductionDeployment.Id}, Status: {lastProductionDeployment.Status}, Result: {lastProductionDeployment.Result}");
-
-    // Print all date-related properties
-    Console.WriteLine("Date Properties:");
-    Console.WriteLine($"StartTime: {lastProductionDeployment.StartTime}");
-    Console.WriteLine($"FinishTime: {lastProductionDeployment.FinishTime}");
-    Console.WriteLine($"QueueTime: {lastProductionDeployment.QueueTime}");
-
-    // Retrieve Active and Completed Pull Requests and Log All Retrieved PRs
-    var pullRequests = await gitClient.GetPullRequestsAsync(
-        targetRepo.Id,
-        new GitPullRequestSearchCriteria
+        if (lastProductionDeploymentStartTime == null)
         {
-            Status = PullRequestStatus.All
+            Console.WriteLine("No successful and completed builds found.");
+            return;
         }
-    );
 
-    // Convert PR CreationDate to UTC for comparison
-    var filteredPullRequests = pullRequests.Where(pr =>
-    {
-        var creationDate = DateTime.SpecifyKind(pr.CreationDate, DateTimeKind.Local);
-        var creationDateUtc = TimeZoneInfo.ConvertTimeToUtc(creationDate, TimeZoneInfo.Local);
-        return creationDateUtc > lastProductionDeployment.StartTime && pr.Status != PullRequestStatus.Abandoned;
-    });
+        var targetRepo = await connection.GetRepositoryByName(configData.Repo);
 
-    Console.WriteLine("Pull Requests Created After Last Production Deployment Start Time:");
-    foreach (var pr in filteredPullRequests)
-    {
-        Console.WriteLine($"PR ID: {pr.PullRequestId}, Title: {pr.Title}, Created: {pr.CreationDate}");
+        if (targetRepo == null)
+        {
+            throw new Exception("Repository not found.");
+        }
+
+        var prs = await connection.GetPullRequestsSince(targetRepo.Id, lastProductionDeploymentStartTime.Value);
+
+        Console.WriteLine("Pull Requests Created After Last Production Deployment Start Time:");
+        foreach (var pr in prs)
+        {
+            Console.WriteLine($"PR ID: {pr.PullRequestId}, Title: {pr.Title}, Created: {pr.CreationDate}");
+        }
     }
-}
-else
-{
-    Console.WriteLine("No successful and completed builds found.");
 }
