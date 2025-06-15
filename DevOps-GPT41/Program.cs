@@ -18,9 +18,16 @@ class Program
 
         Console.WriteLine($"Repository: {repo}, Organization: {org}");
 
-        // Authenticate and retrieve repository data
-        var repositoryData = await GetRepositoryDataAsync(org, repo, pat);
-        Console.WriteLine(JsonSerializer.Serialize(repositoryData, new JsonSerializerOptions { WriteIndented = true }));
+        try
+        {
+            // Authenticate and retrieve repository data
+            var repositoryData = await GetRepositoryDataAsync(org, repo, pat);
+            Console.WriteLine(JsonSerializer.Serialize(repositoryData, new JsonSerializerOptions { WriteIndented = true }));
+        }
+        catch (HttpRequestException ex)
+        {
+            Console.WriteLine($"Error: {ex.Message}");
+        }
     }
 
     static async Task<object> GetRepositoryDataAsync(string organization, string repository, string personalAccessToken)
@@ -36,7 +43,13 @@ class Program
 
         // Make the request
         var response = await client.GetAsync(url);
-        response.EnsureSuccessStatusCode();
+
+        if (!response.IsSuccessStatusCode)
+        {
+            var errorContent = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Error Response: {errorContent}");
+            response.EnsureSuccessStatusCode();
+        }
 
         // Parse and return the response
         var responseContent = await response.Content.ReadAsStringAsync();
