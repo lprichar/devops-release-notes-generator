@@ -3,6 +3,7 @@ using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
+using System.Globalization;
 
 // Load configuration
 var builder = new ConfigurationBuilder()
@@ -83,7 +84,7 @@ if (lastProductionDeployment != null)
     Console.WriteLine($"FinishTime: {lastProductionDeployment.FinishTime}");
     Console.WriteLine($"QueueTime: {lastProductionDeployment.QueueTime}");
 
-    // Retrieve Active and Completed Pull Requests and Filter by Creation Date
+    // Retrieve Active and Completed Pull Requests and Log All Retrieved PRs
     var pullRequests = await gitClient.GetPullRequestsAsync(
         targetRepo.Id,
         new GitPullRequestSearchCriteria
@@ -92,7 +93,13 @@ if (lastProductionDeployment != null)
         }
     );
 
-    var filteredPullRequests = pullRequests.Where(pr => pr.CreationDate > lastProductionDeployment.StartTime && pr.Status != PullRequestStatus.Abandoned);
+    // Convert PR CreationDate to UTC for comparison
+    var filteredPullRequests = pullRequests.Where(pr =>
+    {
+        var creationDate = DateTime.SpecifyKind(pr.CreationDate, DateTimeKind.Local);
+        var creationDateUtc = TimeZoneInfo.ConvertTimeToUtc(creationDate, TimeZoneInfo.Local);
+        return creationDateUtc > lastProductionDeployment.StartTime && pr.Status != PullRequestStatus.Abandoned;
+    });
 
     Console.WriteLine("Pull Requests Created After Last Production Deployment Start Time:");
     foreach (var pr in filteredPullRequests)
