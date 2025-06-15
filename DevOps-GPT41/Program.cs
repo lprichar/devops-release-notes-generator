@@ -4,9 +4,6 @@ using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
 
-// See https://aka.ms/new-console-template for more information
-Console.WriteLine("Hello, World!");
-
 // Load configuration
 var builder = new ConfigurationBuilder()
     .AddUserSecrets<Program>();
@@ -43,6 +40,7 @@ if (targetRepo != null)
 else
 {
     Console.WriteLine("Repository not found.");
+    return;
 }
 
 // Retrieve Build Data
@@ -77,20 +75,26 @@ var lastProductionDeployment = builds.FirstOrDefault(b => b.Status == BuildStatu
 if (lastProductionDeployment != null)
 {
     Console.WriteLine("Last Production Deployment:");
-    Console.WriteLine($"Build ID: {lastProductionDeployment.Id}, Status: {lastProductionDeployment.Status}, Result: {lastProductionDeployment.Result}, Completed: {lastProductionDeployment.FinishTime}");
+    Console.WriteLine($"Build ID: {lastProductionDeployment.Id}, Status: {lastProductionDeployment.Status}, Result: {lastProductionDeployment.Result}");
 
-    // Retrieve All Pull Requests and Filter by Creation Date
+    // Print all date-related properties
+    Console.WriteLine("Date Properties:");
+    Console.WriteLine($"StartTime: {lastProductionDeployment.StartTime}");
+    Console.WriteLine($"FinishTime: {lastProductionDeployment.FinishTime}");
+    Console.WriteLine($"QueueTime: {lastProductionDeployment.QueueTime}");
+
+    // Retrieve Active and Completed Pull Requests and Filter by Creation Date
     var pullRequests = await gitClient.GetPullRequestsAsync(
         targetRepo.Id,
         new GitPullRequestSearchCriteria
         {
-            Status = PullRequestStatus.Active
+            Status = PullRequestStatus.All
         }
     );
 
-    var filteredPullRequests = pullRequests.Where(pr => pr.CreationDate > lastProductionDeployment.FinishTime);
+    var filteredPullRequests = pullRequests.Where(pr => pr.CreationDate > lastProductionDeployment.StartTime && pr.Status != PullRequestStatus.Abandoned);
 
-    Console.WriteLine("Pull Requests Created After Last Production Deployment:");
+    Console.WriteLine("Pull Requests Created After Last Production Deployment Start Time:");
     foreach (var pr in filteredPullRequests)
     {
         Console.WriteLine($"PR ID: {pr.PullRequestId}, Title: {pr.Title}, Created: {pr.CreationDate}");
