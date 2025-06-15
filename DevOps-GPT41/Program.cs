@@ -68,20 +68,18 @@ var definitionId = definition.Id;
 var builds = await buildClient.GetBuildsAsync(
     project: project,
     definitions: new List<int> { definitionId },
-    queryOrder: BuildQueryOrder.FinishTimeDescending,
+    queryOrder: BuildQueryOrder.StartTimeDescending,
     top: 10
 );
 
-// Display Build Information
-if (builds.Count > 0)
+// Find the First Successful and Completed Build
+var firstSuccessfulBuild = builds.FirstOrDefault(b => b.Status == BuildStatus.Completed && b.Result == BuildResult.Succeeded);
+if (firstSuccessfulBuild != null)
 {
-    Console.WriteLine("10 Most Recent Builds for Pipeline 'CD':");
-    foreach (var build in builds)
-    {
-        Console.WriteLine($"Build ID: {build.Id}, Status: {build.Status}, Result: {build.Result}, Completed: {build.FinishTime}");
-    }
+    Console.WriteLine("First Successful and Completed Build:");
+    Console.WriteLine($"Build ID: {firstSuccessfulBuild.Id}, Status: {firstSuccessfulBuild.Status}, Result: {firstSuccessfulBuild.Result}, Completed: {firstSuccessfulBuild.FinishTime}");
 }
 else
 {
-    Console.WriteLine("No builds found for pipeline 'CD'.");
+    Console.WriteLine("No successful and completed builds found.");
 }
