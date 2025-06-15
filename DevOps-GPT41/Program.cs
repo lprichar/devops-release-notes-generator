@@ -1,5 +1,6 @@
 ﻿using Microsoft.Extensions.Configuration;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
+using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
 
@@ -15,10 +16,11 @@ var configuration = builder.Build();
 string? repo = configuration["repo"];
 string? org = configuration["org"];
 string? pat = configuration["pat"];
+string? project = configuration["project"];
 
-if (string.IsNullOrEmpty(repo) || string.IsNullOrEmpty(org) || string.IsNullOrEmpty(pat))
+if (string.IsNullOrEmpty(repo) || string.IsNullOrEmpty(org) || string.IsNullOrEmpty(pat) || string.IsNullOrEmpty(project))
 {
-    Console.WriteLine("Missing required configuration values: 'repo', 'org', or 'pat'.");
+    Console.WriteLine("Missing required configuration values: 'repo', 'org', 'pat', or 'project'.");
     return;
 }
 
@@ -41,4 +43,45 @@ if (targetRepo != null)
 else
 {
     Console.WriteLine("Repository not found.");
+}
+
+// Retrieve Build Data
+var buildClient = connection.GetClient<BuildHttpClient>();
+
+var definitions = await buildClient.GetDefinitionsAsync(project: project);
+
+if (definitions == null || definitions.Count == 0)
+{
+    Console.WriteLine("Pipeline 'CD' not found.");
+    return;
+}
+
+var definition = definitions.FirstOrDefault(d => d.Name.Equals("CD", StringComparison.OrdinalIgnoreCase));
+
+if (definition == null)
+{
+    Console.WriteLine("Pipeline 'CD' not found.");
+    return;
+}
+
+var definitionId = definition.Id;
+var builds = await buildClient.GetBuildsAsync(
+    project: project,
+    definitions: new List<int> { definitionId },
+    queryOrder: BuildQueryOrder.FinishTimeDescending,
+    top: 10
+);
+
+// Display Build Information
+if (builds.Count > 0)
+{
+    Console.WriteLine("10 Most Recent Builds for Pipeline 'CD':");
+    foreach (var build in builds)
+    {
+        Console.WriteLine($"Build ID: {build.Id}, Status: {build.Status}, Result: {build.Result}, Completed: {build.FinishTime}");
+    }
+}
+else
+{
+    Console.WriteLine("No builds found for pipeline 'CD'.");
 }
