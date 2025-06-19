@@ -1,4 +1,6 @@
-﻿namespace DevOps_GPT41;
+﻿using System.Text.Json;
+
+namespace DevOps_GPT41;
 
 internal abstract class Program
 {
@@ -20,12 +22,8 @@ internal abstract class Program
             throw new Exception("Repository not found.");
         }
 
-        var prs = await connection.GetPullRequestsBetween(targetRepo.Id, previousDeployment.Value, latestDeployment.Value);
-
-        Console.WriteLine($"Pull Requests Created Between Last Two Production Deployments ({previousDeployment} - {latestDeployment}):");
-        foreach (var pr in prs.OrderBy(pr => pr.ClosedDate))
-        {
-            Console.WriteLine($"PR ID: {pr.PullRequestId}, Title: {pr.Title}, Created: {pr.CreationDate}");
-        }
+        var prList = await connection.GetPullRequestsBetween(targetRepo.Id, previousDeployment.Value, latestDeployment.Value);
+        var json = JsonSerializer.Serialize(prList, new JsonSerializerOptions { WriteIndented = true });
+        Console.WriteLine(json);
     }
 }

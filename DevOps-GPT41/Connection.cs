@@ -2,8 +2,11 @@ using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
+using System.Text.Json.Serialization;
 
 namespace DevOps_GPT41;
+
+public record Pr(int Id, DateTime CompletionDate, string Title, string Body);
 
 public class Connection
 {
@@ -47,7 +50,7 @@ public class Connection
         return await buildClient.GetBuildsAsync(project, definitions, queryOrder: queryOrder, top: top);
     }
 
-    public async Task<IEnumerable<GitPullRequest>> GetPullRequestsBetween(Guid repositoryId, DateTime from, DateTime to)
+    public async Task<List<Pr>> GetPullRequestsBetween(Guid repositoryId, DateTime from, DateTime to)
     {
         var pullRequests = await GetPullRequestsAsync(
             repositoryId,
@@ -56,15 +59,22 @@ public class Connection
                 Status = PullRequestStatus.All
             }
         );
-        return pullRequests.Where(pr =>
-        {
-            if (pr.Status == PullRequestStatus.Abandoned)
-                return false;
-            // ClosedDate is non-nullable, so just use it directly
-            var closedDate = pr.ClosedDate;
-            var closedDateUtc = closedDate.Kind == DateTimeKind.Utc ? closedDate : TimeZoneInfo.ConvertTimeToUtc(closedDate);
-            return closedDateUtc > from && closedDateUtc <= to;
-        });
+        return pullRequests
+            .Where(pr => pr.Status != PullRequestStatus.Abandoned)
+            .Select(pr =>
+            {
+                var closedDate = pr.ClosedDate;
+                var closedDateUtc = closedDate.Kind == DateTimeKind.Utc ? closedDate : TimeZoneInfo.ConvertTimeToUtc(closedDate);
+                return new { pr, closedDateUtc };
+            })
+            .Where(x => x.closedDateUtc > from && x.closedDateUtc <= to)
+            .OrderBy(x => x.closedDateUtc)
+            .Select(x => new Pr(
+                x.pr.PullRequestId,
+                x.closedDateUtc,
+                x.pr.Title ?? string.Empty,
+                x.pr.Description ?? string.Empty))
+            .ToList();
     }
 
     public async Task<(DateTime? Previous, DateTime? Latest)> GetLastTwoProductionDeployments(string project, string pipelineName)
