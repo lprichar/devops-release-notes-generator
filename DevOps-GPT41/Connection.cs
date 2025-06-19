@@ -47,7 +47,7 @@ public class Connection
         return await buildClient.GetBuildsAsync(project, definitions, queryOrder: queryOrder, top: top);
     }
 
-    public async Task<IEnumerable<GitPullRequest>> GetPullRequestsSince(Guid repositoryId, DateTime since)
+    public async Task<IEnumerable<GitPullRequest>> GetPullRequestsBetween(Guid repositoryId, DateTime from, DateTime to)
     {
         var pullRequests = await GetPullRequestsAsync(
             repositoryId,
@@ -56,46 +56,39 @@ public class Connection
                 Status = PullRequestStatus.All
             }
         );
-
         return pullRequests.Where(pr =>
         {
             var creationDate = DateTime.SpecifyKind(pr.CreationDate, DateTimeKind.Local);
             var creationDateUtc = TimeZoneInfo.ConvertTimeToUtc(creationDate, TimeZoneInfo.Local);
-            return creationDateUtc > since && pr.Status != PullRequestStatus.Abandoned;
+            return creationDateUtc > from && creationDateUtc <= to && pr.Status != PullRequestStatus.Abandoned;
         });
     }
 
-    public async Task<DateTime?> GetLastProductionDeployment(string project, string pipelineName)
+    public async Task<(DateTime? Previous, DateTime? Latest)> GetLastTwoProductionDeployments(string project, string pipelineName)
     {
         var definitions = await GetDefinitionsAsync(project);
-
         if (!definitions.Any())
         {
             Console.WriteLine($"Pipeline '{pipelineName}' not found.");
-            return null;
+            return (null, null);
         }
-
         var definition = definitions.FirstOrDefault(d => d.Name.Equals(pipelineName, StringComparison.OrdinalIgnoreCase));
-
         if (definition == null)
         {
             Console.WriteLine($"Pipeline '{pipelineName}' not found.");
-            return null;
+            return (null, null);
         }
-
         var builds = await GetBuildsAsync(
             project,
             new List<int> { definition.Id },
             BuildQueryOrder.StartTimeDescending,
             top: 100
         );
-
-        var lastProductionDeployment = builds.FirstOrDefault(b => b is
-        {
-            Status: BuildStatus.Completed, 
-            Result: BuildResult.Succeeded
-        });
-
-        return lastProductionDeployment?.StartTime;
+        var deployments = builds
+            .Where(b => b is { Status: BuildStatus.Completed, Result: BuildResult.Succeeded })
+            .OrderByDescending(b => b.StartTime)
+            .Take(2)
+            .ToList();
+        return (deployments.Count == 2 ? deployments[1].StartTime : null, deployments.FirstOrDefault()?.StartTime);
     }
 }
