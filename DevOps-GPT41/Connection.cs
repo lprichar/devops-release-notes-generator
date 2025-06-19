@@ -58,9 +58,12 @@ public class Connection
         );
         return pullRequests.Where(pr =>
         {
-            var creationDate = DateTime.SpecifyKind(pr.CreationDate, DateTimeKind.Local);
-            var creationDateUtc = TimeZoneInfo.ConvertTimeToUtc(creationDate, TimeZoneInfo.Local);
-            return creationDateUtc > from && creationDateUtc <= to && pr.Status != PullRequestStatus.Abandoned;
+            if (pr.Status == PullRequestStatus.Abandoned)
+                return false;
+            // ClosedDate is non-nullable, so just use it directly
+            var closedDate = pr.ClosedDate;
+            var closedDateUtc = closedDate.Kind == DateTimeKind.Utc ? closedDate : TimeZoneInfo.ConvertTimeToUtc(closedDate);
+            return closedDateUtc > from && closedDateUtc <= to;
         });
     }
 

@@ -23,7 +23,7 @@ internal abstract class Program
         var prs = await connection.GetPullRequestsBetween(targetRepo.Id, previousDeployment.Value, latestDeployment.Value);
 
         Console.WriteLine($"Pull Requests Created Between Last Two Production Deployments ({previousDeployment} - {latestDeployment}):");
-        foreach (var pr in prs)
+        foreach (var pr in prs.OrderBy(pr => pr.ClosedDate))
         {
             Console.WriteLine($"PR ID: {pr.PullRequestId}, Title: {pr.Title}, Created: {pr.CreationDate}");
         }
