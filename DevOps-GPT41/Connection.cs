@@ -52,6 +52,7 @@ public class Connection
 
     public async Task<List<Pr>> GetPullRequestsBetween(Guid repositoryId, DateTime from, DateTime to)
     {
+        var gitClient = _vssConnection.GetClient<GitHttpClient>();
         var pullRequests = await GetPullRequestsAsync(
             repositoryId,
             new GitPullRequestSearchCriteria
@@ -59,22 +60,29 @@ public class Connection
                 Status = PullRequestStatus.All
             }
         );
-        return pullRequests
+        var filtered = pullRequests
             .Where(pr => pr.Status != PullRequestStatus.Abandoned)
             .Select(pr =>
             {
                 var closedDate = pr.ClosedDate;
                 var closedDateUtc = closedDate.Kind == DateTimeKind.Utc ? closedDate : TimeZoneInfo.ConvertTimeToUtc(closedDate);
-                return new { pr, closedDateUtc };
+                return new { pr.PullRequestId, closedDateUtc, pr.Title };
             })
             .Where(x => x.closedDateUtc > from && x.closedDateUtc <= to)
             .OrderBy(x => x.closedDateUtc)
-            .Select(x => new Pr(
-                x.pr.PullRequestId,
-                x.closedDateUtc,
-                x.pr.Title ?? string.Empty,
-                x.pr.Description ?? string.Empty))
             .ToList();
+
+        var result = new List<Pr>();
+        foreach (var prInfo in filtered)
+        {
+            var fullPr = await gitClient.GetPullRequestAsync(repositoryId, prInfo.PullRequestId);
+            result.Add(new Pr(
+                fullPr.PullRequestId,
+                prInfo.closedDateUtc,
+                fullPr.Title ?? string.Empty,
+                fullPr.Description ?? string.Empty));
+        }
+        return result;
     }
 
     public async Task<(DateTime? Previous, DateTime? Latest)> GetLastTwoProductionDeployments(string project, string pipelineName)
