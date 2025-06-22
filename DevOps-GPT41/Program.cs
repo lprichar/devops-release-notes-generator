@@ -10,9 +10,9 @@ internal abstract class Program
         var connection = new Connection(configData.Org, configData.Pat);
         var (previousDeployment, latestDeployment) = await connection.GetLastTwoProductionDeployments(configData.Project, "CD");
 
-        if (previousDeployment == null || latestDeployment == null)
+        if (latestDeployment == null)
         {
-            Console.WriteLine("Fewer than two successful and completed builds found.");
+            Console.WriteLine("No successful and completed builds found.");
             return;
         }
 
@@ -22,7 +22,10 @@ internal abstract class Program
             throw new Exception("Repository not found.");
         }
 
-        var prList = await connection.GetPullRequestsBetween(targetRepo.Id, previousDeployment.Value, latestDeployment.Value);
+        var prList = latestDeployment.Value > DateTime.UtcNow.AddHours(-24)
+            ? await connection.GetPullRequests(targetRepo.Id, previousDeployment.Value, latestDeployment.Value)
+            : await connection.GetPullRequests(targetRepo.Id, latestDeployment.Value);
+
         var json = JsonSerializer.Serialize(prList, new JsonSerializerOptions { WriteIndented = true });
         Console.WriteLine(json);
     }

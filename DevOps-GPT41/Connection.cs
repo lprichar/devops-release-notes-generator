@@ -50,7 +50,7 @@ public class Connection
         return await buildClient.GetBuildsAsync(project, definitions, queryOrder: queryOrder, top: top);
     }
 
-    public async Task<List<Pr>> GetPullRequestsBetween(Guid repositoryId, DateTime from, DateTime to)
+    public async Task<List<Pr>> GetPullRequests(Guid repositoryId, DateTime from, DateTime? to = null)
     {
         var gitClient = _vssConnection.GetClient<GitHttpClient>();
         var pullRequests = await GetPullRequestsAsync(
@@ -68,7 +68,7 @@ public class Connection
                 var closedDateUtc = closedDate.Kind == DateTimeKind.Utc ? closedDate : TimeZoneInfo.ConvertTimeToUtc(closedDate);
                 return new { pr.PullRequestId, closedDateUtc, pr.Title };
             })
-            .Where(x => x.closedDateUtc > from && x.closedDateUtc <= to)
+            .Where(x => x.closedDateUtc > from && (to == null || x.closedDateUtc <= to))
             .OrderBy(x => x.closedDateUtc)
             .ToList();
 
