@@ -1,4 +1,6 @@
 using System.Text.Json;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 
 namespace DevOps_GPT41;
 
@@ -6,27 +8,25 @@ internal abstract class Program
 {
     static async Task Main()
     {
-        var configData = new ConfigurationData();
-        var connection = new Connection(configData.Org, configData.Pat);
-        var (previousDeployment, latestDeployment) = await connection.GetLastTwoProductionDeployments(configData.Project, "CD");
+        var host = CreateHostBuilder().Build();
 
-        if (latestDeployment == null)
-        {
-            Console.WriteLine("No successful and completed builds found.");
-            return;
-        }
-
-        var targetRepo = await connection.GetRepositoryByName(configData.Repo);
-        if (targetRepo == null)
-        {
-            throw new Exception("Repository not found.");
-        }
-
-        var prList = latestDeployment.Value > DateTime.UtcNow.AddHours(-24)
-            ? await connection.GetPullRequests(targetRepo.Id, previousDeployment.Value, latestDeployment.Value)
-            : await connection.GetPullRequests(targetRepo.Id, latestDeployment.Value);
-
-        var json = JsonSerializer.Serialize(prList, new JsonSerializerOptions { WriteIndented = true });
-        Console.WriteLine(json);
+        var devOpsManager = host.Services.GetRequiredService<DevOpsManager>();
+        var result = await devOpsManager.GenerateReleaseNotesAsync();
+        Console.WriteLine(result);
     }
+
+    private static IHostBuilder CreateHostBuilder() =>
+        Host.CreateDefaultBuilder()
+            .ConfigureServices((_, services) =>
+            {
+                // Register dependencies
+                services.AddSingleton<IConfigurationData, ConfigurationData>();
+                services.AddSingleton<IDateTimeProvider, DefaultDateTimeProvider>();
+                services.AddSingleton<IConnection>(provider =>
+                {
+                    var config = provider.GetRequiredService<IConfigurationData>();
+                    return new Connection(config.Org, config.Pat);
+                });
+                services.AddSingleton<DevOpsManager>();
+            });
 }

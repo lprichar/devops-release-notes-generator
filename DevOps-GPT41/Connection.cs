@@ -8,7 +8,7 @@ namespace DevOps_GPT41;
 
 public record Pr(int Id, DateTime CompletionDate, string Title, string Body);
 
-public class Connection
+public class Connection : IConnection
 {
     private readonly VssConnection _vssConnection;
 
