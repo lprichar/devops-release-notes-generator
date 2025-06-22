@@ -8,7 +8,27 @@ namespace DevOps_GPT41;
 
 public record Pr(int Id, DateTime CompletionDate, string Title, string Body);
 
-public class Connection
+public interface IDateTimeProvider
+{
+    DateTime UtcNow { get; }
+    DateTime GetUtcNow();
+}
+
+public class DateTimeProvider : IDateTimeProvider
+{
+    public DateTime UtcNow => DateTime.UtcNow;
+    public DateTime GetUtcNow() => DateTime.UtcNow;
+}
+
+public interface IConnection
+{
+    Task<IEnumerable<GitRepository>> GetRepositoriesAsync();
+    Task<GitRepository?> GetRepositoryByName(string repoName);
+    Task<List<Pr>> GetPullRequests(Guid repositoryId, DateTime from, DateTime? to = null);
+    Task<(DateTime? Previous, DateTime? Latest)> GetLastTwoProductionDeployments(string project, string pipelineName);
+}
+
+public class Connection : IConnection
 {
     private readonly VssConnection _vssConnection;
 
@@ -19,13 +39,13 @@ public class Connection
         _vssConnection = new VssConnection(orgUrl, credentials);
     }
 
-    public async Task<IEnumerable<GitRepository>> GetRepositoriesAsync()
+    public async Task<IEnumerable<Microsoft.TeamFoundation.SourceControl.WebApi.GitRepository>> GetRepositoriesAsync()
     {
         var gitClient = _vssConnection.GetClient<GitHttpClient>();
         return await gitClient.GetRepositoriesAsync();
     }
 
-    public async Task<GitRepository?> GetRepositoryByName(string repoName)
+    public async Task<Microsoft.TeamFoundation.SourceControl.WebApi.GitRepository?> GetRepositoryByName(string repoName)
     {
         var gitClient = _vssConnection.GetClient<GitHttpClient>();
         var repositories = await gitClient.GetRepositoriesAsync();

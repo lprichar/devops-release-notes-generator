@@ -2,7 +2,15 @@ using Microsoft.Extensions.Configuration;
 
 namespace DevOps_GPT41;
 
-public record ConfigurationData
+public interface IConfigurationData
+{
+    string Repo { get; }
+    string Org { get; }
+    string Pat { get; }
+    string Project { get; }
+}
+
+public class ConfigurationData : IConfigurationData
 {
     public string Repo { get; }
     public string Org { get; }
