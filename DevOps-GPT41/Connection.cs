@@ -50,9 +50,13 @@ public class Connection
         return await buildClient.GetBuildsAsync(project, definitions, queryOrder: queryOrder, top: top);
     }
 
-    public async Task<List<Pr>> GetPullRequests(Guid repositoryId, DateTime from, DateTime? to = null)
+    public async Task<List<Pr>> GetPullRequests(string repoName, DateTime from, DateTime? to = null)
     {
         var gitClient = _vssConnection.GetClient<GitHttpClient>();
+        var repository = await GetRepositoryByName(repoName);
+        if (repository == null)
+            throw new Exception($"Repository '{repoName}' not found.");
+        var repositoryId = repository.Id;
         var pullRequests = await GetPullRequestsAsync(
             repositoryId,
             new GitPullRequestSearchCriteria

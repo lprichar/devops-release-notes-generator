@@ -13,15 +13,11 @@ public class DevOpsManager(IDateTimeProvider dateTimeProvider, Connection connec
             return null;
         }
 
-        var targetRepo = await connection.GetRepositoryByName(configData.Repo);
-        if (targetRepo == null)
-        {
-            throw new Exception("Repository not found.");
-        }
+        var isRecent = latestDeployment.Value > dateTimeProvider.UtcNow.AddHours(-24);
+        var from = isRecent ? previousDeployment.Value : latestDeployment.Value;
+        DateTime? to = isRecent ? latestDeployment.Value : null;
 
-        var prList = latestDeployment.Value > dateTimeProvider.UtcNow.AddHours(-24)
-            ? await connection.GetPullRequests(targetRepo.Id, previousDeployment.Value, latestDeployment.Value)
-            : await connection.GetPullRequests(targetRepo.Id, latestDeployment.Value);
+        var prList = await connection.GetPullRequests(configData.Repo, from, to);
 
         return JsonSerializer.Serialize(prList, new JsonSerializerOptions { WriteIndented = true });
     }
