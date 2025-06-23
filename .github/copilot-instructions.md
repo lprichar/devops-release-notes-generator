@@ -1,42 +1,18 @@
-# .NET Code Style
+# GitHub Copilot Instructions
 
-- Prefer functional programming paradigms
-- Prefer LINQ statements over loops when appropriate
-- Use modern C# language features for .NET 9
+These instructions define how GitHub Copilot should assist with this project. The goal is to ensure consistent, high-quality code generation aligned with our conventions, stack, and best practices.
 
-# Clean Code Code Guidelines
+## 🧠 Context
 
-Adhere to the following principles derived from Uncle Bob's Clean Code:
+- **Project Type**: Console App
+- **Language**: C#
+- **Framework / Libraries**: .NET 9 / xUnit
+- **Architecture**: Clean Architecture
 
-## Meaningful Names
+## 🔧 General Guidelines
 
-- Use descriptive and unambiguous names.
-- Avoid abbreviations unless they are widely understood.
-- Use pronounceable names and maintain consistent naming conventions.
-
-## Small Functions
-
-- Ensure functions are small and perform a single task.
-- Avoid flag arguments and side effects.
-- Each function should operate at a single level of abstraction.
-
-## Single Responsibility Principle
-
-- Each class or function should have only one reason to change.
-- Separate concerns and encapsulate responsibilities appropriately.
-
-## Avoid Comments
-
-- Write self-explanatory code that doesn’t require comments.
-- Use comments only to explain complex logic or public APIs.
-
-## Error Handling
-
-- Use exceptions rather than return codes.
-- Avoid catching generic exceptions.
-- Fail fast and handle exceptions at a high level.
-
-## Avoid Duplication
-
-- Extract common logic into functions or classes.
-- DRY – Don’t Repeat Yourself.
+- Use C#-idiomatic patterns and follow .NET coding conventions.
+- Use primary constructors when possible
+- Use nullable reference types (`#nullable enable`) and async/await.
+- Format using `dotnet format` or IDE auto-formatting tools.
+- Prioritize readability, testability, and SOLID principles.
