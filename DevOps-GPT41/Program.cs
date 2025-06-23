@@ -8,25 +8,17 @@ internal abstract class Program
     {
         var configData = new ConfigurationData();
         var connection = new Connection(configData.Org, configData.Pat);
-        var (previousDeployment, latestDeployment) = await connection.GetLastTwoProductionDeployments(configData.Project, "CD");
+        var dateTimeProvider = new SystemDateTimeProvider();
+        var manager = new DevOpsManager(configData, connection, dateTimeProvider);
 
-        if (latestDeployment == null)
+        try
         {
-            Console.WriteLine("No successful and completed builds found.");
-            return;
+            var result = await manager.GetPullRequestsJsonAsync();
+            Console.WriteLine(result);
         }
-
-        var targetRepo = await connection.GetRepositoryByName(configData.Repo);
-        if (targetRepo == null)
+        catch (Exception ex)
         {
-            throw new Exception("Repository not found.");
+            Console.WriteLine($"Error: {ex.Message}");
         }
-
-        var prList = latestDeployment.Value > DateTime.UtcNow.AddHours(-24)
-            ? await connection.GetPullRequests(targetRepo.Id, previousDeployment.Value, latestDeployment.Value)
-            : await connection.GetPullRequests(targetRepo.Id, latestDeployment.Value);
-
-        var json = JsonSerializer.Serialize(prList, new JsonSerializerOptions { WriteIndented = true });
-        Console.WriteLine(json);
     }
 }
