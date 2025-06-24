@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using Moq;
 using Shouldly;
 using Xunit;
