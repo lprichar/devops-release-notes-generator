@@ -8,7 +8,15 @@ namespace DevOps_GPT41;
 
 public record Pr(int Id, DateTime CompletionDate, string Title, string Body);
 
-public class Connection
+public interface IConnection
+{
+    Task<IEnumerable<GitRepository>> GetRepositoriesAsync();
+    Task<GitRepository?> GetRepositoryByName(string repoName);
+    Task<List<Pr>> GetPullRequests(string repoName, DateTime from, DateTime? to = null);
+    Task<(DateTime? Previous, DateTime? Latest)> GetLastTwoProductionDeployments(string project, string pipelineName);
+}
+
+public class Connection : IConnection
 {
     private readonly VssConnection _vssConnection;
 

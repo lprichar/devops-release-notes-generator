@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace DevOps_GPT41;
 
-public class DevOpsManager(IDateTimeProvider dateTimeProvider, Connection connection, ConfigurationData configData)
+public class DevOpsManager(IDateTimeProvider dateTimeProvider, IConnection connection, ConfigurationData configData)
 {
     public async Task<string?> GenerateReleaseNotesJson()
     {
