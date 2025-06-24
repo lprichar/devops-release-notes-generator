@@ -2,7 +2,6 @@ using Moq;
 using Shouldly;
 using Xunit;
 using DevOps_GPT41;
-using System;
 
 namespace DevOps_GPT41.Tests;
 
