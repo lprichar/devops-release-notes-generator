@@ -21,13 +21,16 @@ These instructions define how GitHub Copilot should assist with this project. Th
 
 - Use xUnit
 - Use Shouldly for assertions
+- Run tests after creating or modifying tests.
 
 ### Naming conventions
 
 Unit tests should names should consist of three parts, using the following format Given[Arrange]_When[Act]_Then[Assert] 
 * Given - should append the starting conditions and any parameter conditions 
 * When - should append the method name being tested
-* Then - should append the expected result
+* Then - should append the expected result with the word "It" if possible.  
+
+Ideally tests test only one thing and so the then clause can be specific, so instead of "_ThenGetItemsCalledWithCorrectFromAndTo" it should be "_ThenGetItemsCalledWithNullTo"
 
 Example where parameter is not included: 
 Item ItemRepository.GetById(int id)
