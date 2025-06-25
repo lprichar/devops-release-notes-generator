@@ -39,7 +39,7 @@ public class DevOpsManagerTest
         mockConnection.Setup(x => x.GetLastTwoProductionDeployments(It.IsAny<string>(), It.IsAny<string>()))
             .ReturnsAsync(( (DateTime?)null, (DateTime?)lastBuild ));
         mockConnection.Setup(x => x.GetPullRequests(It.IsAny<string>(), It.IsAny<DateTime>(), It.IsAny<DateTime?>()))
-            .ReturnsAsync(Array.Empty<PullRequest>());
+            .ReturnsAsync(new List<Pr>());
 
         var configData = MakeConfigurationData();
         var manager = new DevOpsManager(mockDateTimeProvider.Object, mockConnection.Object, configData);
