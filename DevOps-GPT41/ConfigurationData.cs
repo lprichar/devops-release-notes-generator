@@ -4,10 +4,10 @@ namespace DevOps_GPT41;
 
 public record ConfigurationData
 {
-    public string Repo { get; }
-    public string Org { get; }
-    public string Pat { get; }
-    public string Project { get; }
+    public virtual string Repo { get; }
+    public virtual string Org { get; }
+    public virtual string Pat { get; }
+    public virtual string Project { get; }
 
     public ConfigurationData()
     {
