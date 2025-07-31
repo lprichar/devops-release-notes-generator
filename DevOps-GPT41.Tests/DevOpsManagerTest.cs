@@ -54,6 +54,29 @@ public class DevOpsManagerTest
             null), Times.Once);
     }
 
+    [Fact]
+    public async Task GivenPreviousDeploymentNullAndLatestDeploymentNotNull_WhenGenerateReleaseNotesJson_ThenThrowsException()
+    {
+        // Arrange
+        var mockDateTimeProvider = new Mock<IDateTimeProvider>();
+        mockDateTimeProvider.Setup(x => x.UtcNow).Returns(DateTime.UtcNow);
+
+        var mockConnection = new Mock<IConnection>();
+        var latestDeployment = DateTime.UtcNow;
+        mockConnection.Setup(x => x.GetLastTwoProductionDeployments(It.IsAny<string>(), It.IsAny<string>()))
+            .ReturnsAsync(((DateTime?)null, (DateTime?)latestDeployment));
+
+        var configData = MakeConfigurationData();
+        var manager = new DevOpsManager(mockDateTimeProvider.Object, mockConnection.Object, configData);
+
+        // Act
+        var ex = await Record.ExceptionAsync(() => manager.GenerateReleaseNotesJson());
+
+        // Assert
+        ex.ShouldNotBeNull();
+        ex.ShouldBeOfType<InvalidOperationException>();
+    }
+
     private static ConfigurationData MakeConfigurationData(
         string repo = "repo",
         string org = "org",
