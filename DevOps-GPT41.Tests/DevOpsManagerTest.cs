@@ -83,11 +83,8 @@ public class DevOpsManagerTest
         string pat = "pat",
         string project = "project")
     {
-        var mock = new Mock<ConfigurationData>();
-        mock.SetupGet(x => x.Repo).Returns(repo);
-        mock.SetupGet(x => x.Org).Returns(org);
-        mock.SetupGet(x => x.Pat).Returns(pat);
-        mock.SetupGet(x => x.Project).Returns(project);
-        return mock.Object;
+        return new TestConfigurationData(repo, org, pat, project);
     }
+
+    private record TestConfigurationData(string repo, string org, string pat, string project) : ConfigurationData(repo, org, pat, project);
 }
