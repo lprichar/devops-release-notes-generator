@@ -20,4 +20,12 @@ public record ConfigurationData
         Pat = configuration["pat"] ?? throw new Exception("Missing required configuration value: 'pat'.");
         Project = configuration["project"] ?? throw new Exception("Missing required configuration value: 'project'.");
     }
+
+    protected ConfigurationData(string repo, string org, string pat, string project)
+    {
+        Repo = repo;
+        Org = org;
+        Pat = pat;
+        Project = project;
+    }
 }

@@ -11,12 +11,12 @@ internal abstract class Program
         var connection = new Connection(configData.Org, configData.Pat);
         var dateTimeProvider = new UtcDateTimeProvider();
         var manager = new DevOpsManager(dateTimeProvider, connection, configData);
-        var json = await manager.GenerateReleaseNotesJson();
-        if (json == null)
+        var yaml = await manager.GenerateReleaseNotesYaml();
+        if (yaml == null)
         {
             Console.WriteLine("No successful and completed builds found.");
             return;
         }
-        Console.WriteLine(json);
+        Console.WriteLine(yaml);
     }
 }
