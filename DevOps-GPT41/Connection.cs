@@ -1,11 +1,13 @@
 using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
+using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
+using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
 
 namespace DevOps_GPT41;
 
-public record Pr(DateTime CompletionDate, string Title, string Body);
+public record Pr(DateTime CompletionDate, string Title, string Body, string WorkItemDescription);
 
 public interface IConnection
 {
@@ -16,6 +18,11 @@ public interface IConnection
 
 public class Connection : IConnection
 {
+    private const string DescriptionField = "System.Description";
+    private const string WorkItemTypeField = "System.WorkItemType";
+    private const string TaskWorkItemType = "Task";
+    private const string ParentRelation = "System.LinkTypes.Hierarchy-Reverse";
+
     private readonly VssConnection _vssConnection;
 
     public Connection(string org, string pat)
@@ -59,6 +66,7 @@ public class Connection : IConnection
     public async Task<List<Pr>> GetPullRequests(string repoName, DateTime from, DateTime? to = null)
     {
         var gitClient = _vssConnection.GetClient<GitHttpClient>();
+        var workItemClient = _vssConnection.GetClient<WorkItemTrackingHttpClient>();
         var repository = await GetRepositoryByName(repoName);
         if (repository == null)
             throw new Exception($"Repository '{repoName}' not found.");
@@ -86,12 +94,73 @@ public class Connection : IConnection
         foreach (var prInfo in filtered)
         {
             var fullPr = await gitClient.GetPullRequestAsync(repositoryId, prInfo.PullRequestId);
+            var workItemDescription = await GetFirstWorkItemDescriptionAsync(workItemClient, gitClient, repositoryId, prInfo.PullRequestId);
             result.Add(new Pr(
                 prInfo.closedDateUtc,
                 fullPr.Title ?? string.Empty,
-                fullPr.Description ?? string.Empty));
+                fullPr.Description ?? string.Empty,
+                workItemDescription));
         }
         return result;
+    }
+
+    private static async Task<string> GetFirstWorkItemDescriptionAsync(
+        WorkItemTrackingHttpClient workItemClient,
+        GitHttpClient gitClient,
+        Guid repositoryId,
+        int pullRequestId)
+    {
+        var workItems = await gitClient.GetPullRequestWorkItemRefsAsync(repositoryId, pullRequestId);
+        var firstWorkItemId = workItems
+            .Select(x => int.TryParse(x.Id, out var workItemId) ? workItemId : (int?)null)
+            .FirstOrDefault(x => x.HasValue);
+
+        if (firstWorkItemId == null)
+        {
+            return string.Empty;
+        }
+
+        var firstWorkItem = await workItemClient.GetWorkItemAsync(firstWorkItemId.Value, expand: WorkItemExpand.Relations);
+        var workItemType = GetFieldValue(firstWorkItem, WorkItemTypeField);
+
+        if (!string.Equals(workItemType, TaskWorkItemType, StringComparison.OrdinalIgnoreCase))
+        {
+            return GetFieldValue(firstWorkItem, DescriptionField);
+        }
+
+        var parentId = firstWorkItem.Relations?
+            .Where(x => string.Equals(x.Rel, ParentRelation, StringComparison.OrdinalIgnoreCase))
+            .Select(x => ParseWorkItemId(x.Url))
+            .FirstOrDefault(x => x.HasValue);
+
+        if (parentId == null)
+        {
+            return GetFieldValue(firstWorkItem, DescriptionField);
+        }
+
+        var parentWorkItem = await workItemClient.GetWorkItemAsync(parentId.Value);
+        return GetFieldValue(parentWorkItem, DescriptionField);
+    }
+
+    private static int? ParseWorkItemId(string? url)
+    {
+        if (string.IsNullOrWhiteSpace(url))
+        {
+            return null;
+        }
+
+        var lastSegment = url.Split('/').LastOrDefault();
+        return int.TryParse(lastSegment, out var workItemId) ? workItemId : null;
+    }
+
+    private static string GetFieldValue(WorkItem workItem, string fieldName)
+    {
+        if (!workItem.Fields.TryGetValue(fieldName, out var value) || value == null)
+        {
+            return string.Empty;
+        }
+
+        return value.ToString() ?? string.Empty;
     }
 
     public async Task<(DateTime? Previous, DateTime? Latest)> GetLastTwoProductionDeployments(string project, string pipelineName)
