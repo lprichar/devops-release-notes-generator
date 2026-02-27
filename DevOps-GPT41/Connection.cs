@@ -2,16 +2,14 @@ using Microsoft.TeamFoundation.Build.WebApi;
 using Microsoft.TeamFoundation.SourceControl.WebApi;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
-using System.Text.Json.Serialization;
 
 namespace DevOps_GPT41;
 
-public record Pr(int Id, DateTime CompletionDate, string Title, string Body);
+public record Pr(DateTime CompletionDate, string Title, string Body);
 
 public interface IConnection
 {
     Task<IEnumerable<GitRepository>> GetRepositoriesAsync();
-    Task<GitRepository?> GetRepositoryByName(string repoName);
     Task<List<Pr>> GetPullRequests(string repoName, DateTime from, DateTime? to = null);
     Task<(DateTime? Previous, DateTime? Latest)> GetLastTwoProductionDeployments(string project, string pipelineName);
 }
@@ -89,7 +87,6 @@ public class Connection : IConnection
         {
             var fullPr = await gitClient.GetPullRequestAsync(repositoryId, prInfo.PullRequestId);
             result.Add(new Pr(
-                fullPr.PullRequestId,
                 prInfo.closedDateUtc,
                 fullPr.Title ?? string.Empty,
                 fullPr.Description ?? string.Empty));
