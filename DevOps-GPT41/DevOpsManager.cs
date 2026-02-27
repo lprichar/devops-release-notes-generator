@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Encodings.Web;
 
 namespace DevOps_GPT41;
 
@@ -19,6 +20,10 @@ public class DevOpsManager(IDateTimeProvider dateTimeProvider, IConnection conne
 
         var prList = await connection.GetPullRequests(configData.Repo, from, to);
 
-        return JsonSerializer.Serialize(prList, new JsonSerializerOptions { WriteIndented = true });
+        return JsonSerializer.Serialize(prList, new JsonSerializerOptions
+        {
+            WriteIndented = true,
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
+        });
     }
 }

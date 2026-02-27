@@ -4,6 +4,8 @@ using Microsoft.TeamFoundation.WorkItemTracking.WebApi;
 using Microsoft.TeamFoundation.WorkItemTracking.WebApi.Models;
 using Microsoft.VisualStudio.Services.Common;
 using Microsoft.VisualStudio.Services.WebApi;
+using System.Net;
+using System.Text.RegularExpressions;
 
 namespace DevOps_GPT41;
 
@@ -160,7 +162,23 @@ public class Connection : IConnection
             return string.Empty;
         }
 
-        return value.ToString() ?? string.Empty;
+        var rawValue = value.ToString() ?? string.Empty;
+        return string.Equals(fieldName, DescriptionField, StringComparison.OrdinalIgnoreCase)
+            ? CleanDescription(rawValue)
+            : rawValue;
+    }
+
+    private static string CleanDescription(string description)
+    {
+        if (string.IsNullOrWhiteSpace(description))
+        {
+            return string.Empty;
+        }
+
+        var withBreaks = Regex.Replace(description, "<br\\s*/?>", " ", RegexOptions.IgnoreCase);
+        var withoutTags = Regex.Replace(withBreaks, "<.*?>", string.Empty);
+        var withoutNewlines = Regex.Replace(withoutTags, "\n", " ");
+        return WebUtility.HtmlDecode(withoutNewlines).Trim();
     }
 
     public async Task<(DateTime? Previous, DateTime? Latest)> GetLastTwoProductionDeployments(string project, string pipelineName)
