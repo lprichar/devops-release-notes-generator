@@ -206,6 +206,6 @@ public class Connection : IConnection
             .OrderByDescending(b => b.StartTime)
             .Take(2)
             .ToList();
-        return (deployments.Count == 2 ? deployments[1].StartTime : null, deployments.FirstOrDefault()?.StartTime);
+        return (deployments.Count == 2 ? deployments[1].FinishTime : null, deployments.FirstOrDefault()?.FinishTime);
     }
 }
